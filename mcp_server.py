@@ -1,4 +1,5 @@
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.prompts import base
 from pydantic import Field
 
 mcp = FastMCP("DocumentMCP", log_level="ERROR")
@@ -13,7 +14,6 @@ docs = {
     "spec.txt": "These specifications define the technical requirements for the equipment.",
 }
 
-# Writes a tool to read a doc
 @mcp.tool(
     name="read_document",
     description="Reads the contents of a document and  return it as a string."
@@ -24,7 +24,6 @@ def read_document(
         raise ValueError(f"Document Id {doc_id}not found.")
     return docs[doc_id]
 
-# Writes a tool to edit a doc
 @mcp.tool(
     name="edit_document",
     description="Edit a document by replacing a string in the documents content with a new string."
@@ -40,9 +39,46 @@ def edit_document(
     
     docs[doc_id] = docs[doc_id].replace(old_str, new_str)
 
-# TODO: Write a resource to return all doc id's
-# TODO: Write a resource to return the contents of a particular doc
-# TODO: Write a prompt to rewrite a doc in markdown format
+@mcp.resource(
+    "docs://documents",
+    mime_type="application/json",
+    name="list_documents",
+    description="Returns a list of all document ids."
+)
+def list_documents() -> list[str]:
+    return list(docs.keys())
+
+@mcp.resource(
+    "docs://documents/{doc_id}",
+    mime_type="text/plain",
+    name="get_document",
+    description="Returns the contents of a document given its id."
+)
+def get_document(doc_id: str) -> str:
+    if doc_id not in docs:
+        raise ValueError(f"Doc with id {doc_id} not found")
+    return docs[doc_id]
+
+@mcp.prompt(
+    name="format_document", 
+    description="Rewrite a document in markdown format.")
+
+def format_document(
+    doc_id: str = Field(description="Id of the document to format.")
+) -> list[base.Message]:
+    prompt = f"""
+    Your goal is to reformat a document to be written with markdown syntax.
+
+    The id of the document you need to reformat is:
+    <document_id>
+    {doc_id}
+    </document_id>
+
+        Add in headers, bullet points, tables, etc as necessary. Feel free to   add in structure.
+        Use the 'edit_document' tool to edit the document. After the document has been reformatted...
+    """
+
+    return [base.UserMessage(prompt)]
 # TODO: Write a prompt to summarize a doc
 
 
